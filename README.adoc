@@ -1,0 +1,17 @@
+= goquickfix image:https://travis-ci.org/motemen/go-quickfix.svg?branch=master["Build Status", link="https://travis-ci.org/motemen/go-quickfix"] image:http://godoc.org/github.com/motemen/go-quickfix?status.svg["GoDoc", link="http://godoc.org/github.com/motemen/go-quickfix"] image:http://gocover.io/_badge/github.com/motemen/go-quickfix["Test Coverage", link="http://gocover.io/github.com/motemen/go-quickfix"]
+
+The goquickfix command quick fixes Go source that is well typed but
+go refuses to compile e.g. "foo imported but not used".
+
+== Installation
+
+    go get github.com/motemen/go-quickfix/cmd/goquickfix
+
+== Usage
+
+    goquickfix [-w] <path>
+
+== TODO
+
+* `-d` option
+* support multiple args
