@@ -1,3 +1,5 @@
+// Package quickfix provides functions to rewrite Go AST
+// that is typed well but "go build" fails to pass building.
 package quickfix
 
 import (
@@ -18,7 +20,13 @@ var (
 	noNewVariableOnDefine = "no new variables on left side of :="
 )
 
-// TODO hardMode
+// QuickFix rewrites AST files of same package so that they pass go build.
+// For example:
+//   - v declared but not used             -> append `_ = v`
+//   - "p" imported but not used           -> rewrite to `import _ "p"`
+//   - no new variables on left side of := -> rewrite `:=` to `=`
+//
+// TODO hardMode, which removes errorneous code rather than adding
 func QuickFix(fset *token.FileSet, files []*ast.File) (err error) {
 	for i := 0; i < 10; i++ {
 		err = quickFix1(fset, files)
