@@ -13,5 +13,15 @@ func F() {
 
 	b := 3
 
+	switch b {
+	default:
+		var x interface{}
+	}
+
+	select {
+	case u := <-make(chan struct{}):
+		var y int
+	}
+
 	os.Exit(0)
 }

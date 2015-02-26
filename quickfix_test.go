@@ -33,11 +33,16 @@ func TestQuickFix(t *testing.T) {
 	}
 
 	_, err = types.Check("testdata/ex1", fset, files)
+
+	for _, f := range files {
+		var buf bytes.Buffer
+		printer.Fprint(&buf, fset, f)
+		t.Log("#", fset.File(f.Pos()).Name())
+		t.Log(buf.String())
+	}
+
 	if err != nil {
 		t.Fatalf("should pass type checking: %s", err)
 	}
 
-	var buf bytes.Buffer
-	printer.Fprint(&buf, fset, files[0])
-	t.Log(buf.String())
 }
