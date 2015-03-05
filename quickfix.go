@@ -9,6 +9,7 @@ import (
 
 	"go/ast"
 	"go/token"
+
 	"golang.org/x/tools/go/ast/astutil"
 	_ "golang.org/x/tools/go/gcimporter"
 	"golang.org/x/tools/go/types"
@@ -174,6 +175,15 @@ func appendStmt(nodepath []ast.Node, stmt ast.Stmt) bool {
 				node.Body = []ast.Stmt{}
 			}
 			node.Body = append(node.Body, stmt)
+
+		case *ast.RangeStmt:
+			if node.Body == nil {
+				node.Body = &ast.BlockStmt{}
+			}
+			if node.Body.List == nil {
+				node.Body.List = []ast.Stmt{}
+			}
+			node.Body.List = append(node.Body.List, stmt)
 
 		default:
 			continue

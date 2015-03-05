@@ -23,5 +23,8 @@ func F() {
 		var y int
 	}
 
+	for i, n := range []int{} {
+	}
+
 	os.Exit(0)
 }
