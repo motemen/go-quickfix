@@ -9,9 +9,11 @@ go refuses to compile e.g. "foo imported but not used".
 
 == Usage
 
-    goquickfix [-w] <path>
+    goquickfix [-w] <path>...
 
 == TODO
 
-* `-d` option
-* support multiple args
+* `-d` option to show diffs
+* `-hard=true` option to remove erroneous code rather than adding new
+* `-undo` option to clear quick fix code
+* no writing on no diffs
