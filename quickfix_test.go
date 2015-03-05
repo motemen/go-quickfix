@@ -32,7 +32,7 @@ func loadTestData(pkgName string) (*token.FileSet, []*ast.File, error) {
 }
 
 func TestQuickFix_General(t *testing.T) {
-	fset, files, err := loadTestData("eg1")
+	fset, files, err := loadTestData("general")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,14 +44,14 @@ func TestQuickFix_General(t *testing.T) {
 
 	logFiles(t, fset, files)
 
-	_, err = types.Check("testdata/eg1", fset, files)
+	_, err = types.Check("testdata/general", fset, files)
 	if err != nil {
 		t.Fatalf("should pass type checking: %s", err)
 	}
 }
 
 func TestQuickFix_RangeStmt(t *testing.T) {
-	fset, files, err := loadTestData("eg2")
+	fset, files, err := loadTestData("rangestmt")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -63,7 +63,7 @@ func TestQuickFix_RangeStmt(t *testing.T) {
 
 	logFiles(t, fset, files)
 
-	_, err = types.Check("testdata/eg2", fset, files)
+	_, err = types.Check("testdata/rangestmt", fset, files)
 	if err != nil {
 		t.Fatalf("should pass type checking: %s", err)
 	}

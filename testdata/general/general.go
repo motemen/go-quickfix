@@ -1,4 +1,4 @@
-package eg1
+package general
 
 import (
 	"fmt"
