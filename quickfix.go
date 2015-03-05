@@ -16,9 +16,9 @@ import (
 )
 
 var (
-	declaredNotUsed       = regexp.MustCompile(`^([a-zA-Z0-9_]+) declared but not used$`)
-	importedNotUsed       = regexp.MustCompile(`^(".+") imported but not used$`)
-	noNewVariableOnDefine = "no new variables on left side of :="
+	declaredNotUsed        = regexp.MustCompile(`^([a-zA-Z0-9_]+) declared but not used$`)
+	importedNotUsed        = regexp.MustCompile(`^(".+") imported but not used$`)
+	noNewVariablesOnDefine = "no new variables on left side of :="
 )
 
 // QuickFix rewrites AST files of same package so that they pass go build.
@@ -29,17 +29,19 @@ var (
 //
 // TODO hardMode, which removes errorneous code rather than adding
 func QuickFix(fset *token.FileSet, files []*ast.File) (err error) {
-	for i := 0; i < 10; i++ {
-		err = quickFix1(fset, files)
-		if err == nil {
-			return
+	const maxTries = 10
+	for i := 0; i < maxTries; i++ {
+		var foundError bool
+		foundError, err = quickFix1(fset, files)
+		if !foundError {
+			return nil
 		}
 	}
 
 	return
 }
 
-func quickFix1(fset *token.FileSet, files []*ast.File) error {
+func quickFix1(fset *token.FileSet, files []*ast.File) (bool, error) {
 	errs := []error{}
 	config := &types.Config{
 		Error: func(err error) {
@@ -49,16 +51,18 @@ func quickFix1(fset *token.FileSet, files []*ast.File) error {
 
 	_, err := config.Check("_quickfix", fset, files, nil)
 	if err == nil {
-		return nil
+		return false, nil
 	}
 
 	// apply fixes on AST later so that we won't break funcs that inspect AST by positions
 	fixes := []func() error{}
 	unhandled := errorList{}
 
+	foundError := len(errs) > 0
+
 	for _, err := range errs {
 		err, ok := err.(types.Error)
-		if !ok || !err.Soft {
+		if !ok {
 			unhandled = append(unhandled, err)
 			continue
 		}
@@ -79,13 +83,13 @@ func quickFix1(fset *token.FileSet, files []*ast.File) error {
 		// - "label %s declared but not used" TODO
 		// - "no new variables on left side of :="
 		if m := declaredNotUsed.FindStringSubmatch(err.Msg); m != nil {
-			ident := m[1]
+			identName := m[1]
 
 			// insert "_ = x" to supress "declared but not used" error
 			stmt := &ast.AssignStmt{
 				Lhs: []ast.Expr{ast.NewIdent("_")},
 				Tok: token.ASSIGN,
-				Rhs: []ast.Expr{ast.NewIdent(ident)},
+				Rhs: []ast.Expr{ast.NewIdent(identName)},
 			}
 
 			fix = func() error {
@@ -108,12 +112,21 @@ func quickFix1(fset *token.FileSet, files []*ast.File) error {
 
 				return err
 			}
-		} else if err.Msg == noNewVariableOnDefine {
+		} else if err.Msg == noNewVariablesOnDefine {
 			fix = func() error {
 				for _, node := range nodepath {
-					if assign, ok := node.(*ast.AssignStmt); ok && assign.Tok == token.DEFINE {
-						assign.Tok = token.ASSIGN
-						return nil
+					switch node := node.(type) {
+					case *ast.AssignStmt:
+						if node.Tok == token.DEFINE {
+							node.Tok = token.ASSIGN
+							return nil
+						}
+
+					case *ast.RangeStmt:
+						if node.Tok == token.DEFINE {
+							node.Tok = token.ASSIGN
+							return nil
+						}
 					}
 				}
 				return err
@@ -134,7 +147,7 @@ func quickFix1(fset *token.FileSet, files []*ast.File) error {
 		}
 	}
 
-	return unhandled.any()
+	return foundError, unhandled.any()
 }
 
 type errorList []error
