@@ -32,7 +32,7 @@ func TestQuickFix(t *testing.T) {
 		t.Fatalf("QuickFix(): %s", err)
 	}
 
-	_, err = types.Check("testdata/ex1", fset, files)
+	_, err = types.Check("testdata/eg1", fset, files)
 
 	for _, f := range files {
 		var buf bytes.Buffer

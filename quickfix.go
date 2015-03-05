@@ -57,12 +57,18 @@ func quickFix1(fset *token.FileSet, files []*ast.File) error {
 
 	for _, err := range errs {
 		err, ok := err.(types.Error)
-		if !ok {
+		if !ok || !err.Soft {
 			unhandled = append(unhandled, err)
 			continue
 		}
 
 		f := findFile(files, err.Pos)
+		if f == nil {
+			err := fmt.Errorf("cannot find file for error %q: %s (%d)", err.Error(), fset.Position(err.Pos), err.Pos)
+			unhandled = append(unhandled, err)
+			continue
+		}
+
 		nodepath, _ := astutil.PathEnclosingInterval(f, err.Pos, err.Pos)
 
 		var fix func() error

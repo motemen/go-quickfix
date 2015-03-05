@@ -18,8 +18,7 @@ var (
 )
 
 func usage() {
-	fmt.Fprintln(os.Stderr, `
-Usage:
+	fmt.Fprintln(os.Stderr, `Usage:
   goquickfix [-w] <path>
 
 Flags:`)
@@ -32,34 +31,49 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	arg := flag.Arg(0)
-	if arg == "" {
+	if flag.NArg() == 0 {
 		flag.Usage()
 	}
 
+	// list of files grouped by package.
 	files := map[string][]*ast.File{}
 
 	fset := token.NewFileSet()
 
-	fi, err := os.Stat(arg)
-	dieIf(err)
-
-	if fi.IsDir() {
-		pkgs, err := parser.ParseDir(fset, arg, nil, parser.ParseComments)
+	for i := 0; i < flag.NArg(); i++ {
+		arg := flag.Arg(i)
+		fi, err := os.Stat(arg)
 		dieIf(err)
 
-		for _, pkg := range pkgs {
-			ff := make([]*ast.File, 0, len(pkg.Files))
-			for _, f := range pkg.Files {
-				ff = append(ff, f)
+		if fi.IsDir() {
+			if i != 0 {
+				die("you can only specify only one directory")
 			}
-			files[pkg.Name] = ff
-		}
-	} else {
-		f, err := parser.ParseFile(fset, arg, nil, parser.ParseComments)
-		dieIf(err)
 
-		files[""] = []*ast.File{f}
+			pkgs, err := parser.ParseDir(fset, arg, nil, parser.ParseComments)
+			dieIf(err)
+
+			for _, pkg := range pkgs {
+				ff := make([]*ast.File, 0, len(pkg.Files))
+				for _, f := range pkg.Files {
+					ff = append(ff, f)
+				}
+				files[pkg.Name] = ff
+			}
+		} else {
+			f, err := parser.ParseFile(fset, arg, nil, parser.ParseComments)
+			dieIf(err)
+
+			const adhocPkg = ""
+
+			// *.go files are grouped as ad-hoc package.
+			if files[adhocPkg] == nil {
+				files[adhocPkg] = []*ast.File{}
+			}
+
+			files[adhocPkg] = append(files[adhocPkg], f)
+		}
+
 	}
 
 	for _, ff := range files {
@@ -86,7 +100,11 @@ func main() {
 
 func dieIf(err error) {
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		die(err)
 	}
+}
+
+func die(msg interface{}) {
+	fmt.Fprintln(os.Stderr, msg)
+	os.Exit(1)
 }
