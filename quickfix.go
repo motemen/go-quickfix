@@ -55,7 +55,7 @@ func quickFix1(fset *token.FileSet, files []*ast.File) (bool, error) {
 	}
 
 	// apply fixes on AST later so that we won't break funcs that inspect AST by positions
-	fixes := []func() error{}
+	fixes := map[error]func() bool{}
 	unhandled := errorList{}
 
 	foundError := len(errs) > 0
@@ -76,7 +76,7 @@ func quickFix1(fset *token.FileSet, files []*ast.File) (bool, error) {
 
 		nodepath, _ := astutil.PathEnclosingInterval(f, err.Pos, err.Pos)
 
-		var fix func() error
+		var fix func() bool
 
 		// - "%s declared but not used"
 		// - "%q imported but not used"
@@ -84,65 +84,29 @@ func quickFix1(fset *token.FileSet, files []*ast.File) (bool, error) {
 		// - "no new variables on left side of :="
 		if m := declaredNotUsed.FindStringSubmatch(err.Msg); m != nil {
 			identName := m[1]
-
-			// insert "_ = x" to supress "declared but not used" error
-			stmt := &ast.AssignStmt{
-				Lhs: []ast.Expr{ast.NewIdent("_")},
-				Tok: token.ASSIGN,
-				Rhs: []ast.Expr{ast.NewIdent(identName)},
-			}
-
-			fix = func() error {
-				if appendStmt(nodepath, stmt) {
-					return nil
-				}
-				return err
+			fix = func() bool {
+				return fixDeclaredNotUsed(nodepath, identName)
 			}
 		} else if m := importedNotUsed.FindStringSubmatch(err.Msg); m != nil {
 			pkgPath := m[1] // quoted string, but it's okay because this will be compared to ast.BasicLit.Value.
-
-			fix = func() error {
-				for _, imp := range f.Imports {
-					if imp.Path.Value == pkgPath {
-						// make this import spec anonymous one
-						imp.Name = ast.NewIdent("_")
-						return nil
-					}
-				}
-
-				return err
+			fix = func() bool {
+				return fixImportedNotUsed(nodepath, pkgPath)
 			}
 		} else if err.Msg == noNewVariablesOnDefine {
-			fix = func() error {
-				for _, node := range nodepath {
-					switch node := node.(type) {
-					case *ast.AssignStmt:
-						if node.Tok == token.DEFINE {
-							node.Tok = token.ASSIGN
-							return nil
-						}
-
-					case *ast.RangeStmt:
-						if node.Tok == token.DEFINE {
-							node.Tok = token.ASSIGN
-							return nil
-						}
-					}
-				}
-				return err
+			fix = func() bool {
+				return fixNoNewVariables(nodepath)
 			}
 		} else {
 			unhandled = append(unhandled, err)
 		}
 
 		if fix != nil {
-			fixes = append(fixes, fix)
+			fixes[err] = fix
 		}
 	}
 
-	for _, fix := range fixes {
-		err := fix()
-		if err != nil {
+	for err, fix := range fixes {
+		if fix() == false {
 			unhandled = append(unhandled, err)
 		}
 	}
@@ -150,19 +114,63 @@ func quickFix1(fset *token.FileSet, files []*ast.File) (bool, error) {
 	return foundError, unhandled.any()
 }
 
+func fixDeclaredNotUsed(nodepath []ast.Node, identName string) bool {
+	// insert "_ = x" to supress "declared but not used" error
+	stmt := &ast.AssignStmt{
+		Lhs: []ast.Expr{ast.NewIdent("_")},
+		Tok: token.ASSIGN,
+		Rhs: []ast.Expr{ast.NewIdent(identName)},
+	}
+	return appendStmt(nodepath, stmt)
+}
+
+func fixImportedNotUsed(nodepath []ast.Node, pkgPath string) bool {
+	for _, node := range nodepath {
+		if f, ok := node.(*ast.File); ok {
+			for _, imp := range f.Imports {
+				if imp.Path.Value == pkgPath {
+					// make this import spec anonymous one
+					imp.Name = ast.NewIdent("_")
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func fixNoNewVariables(nodepath []ast.Node) bool {
+	for _, node := range nodepath {
+		switch node := node.(type) {
+		case *ast.AssignStmt:
+			if node.Tok == token.DEFINE {
+				node.Tok = token.ASSIGN
+				return true
+			}
+
+		case *ast.RangeStmt:
+			if node.Tok == token.DEFINE {
+				node.Tok = token.ASSIGN
+				return true
+			}
+		}
+	}
+	return false
+}
+
 type errorList []error
 
-func (b errorList) any() error {
-	if len(b) == 0 {
+func (errs errorList) any() error {
+	if len(errs) == 0 {
 		return nil
 	}
 
-	return b
+	return errs
 }
 
-func (b errorList) Error() string {
-	s := []string{fmt.Sprintf("%d error(s):", len(b))}
-	for _, e := range b {
+func (errs errorList) Error() string {
+	s := []string{fmt.Sprintf("%d error(s):", len(errs))}
+	for _, e := range errs {
 		s = append(s, fmt.Sprintf("- %s", e))
 	}
 	return strings.Join(s, "\n")

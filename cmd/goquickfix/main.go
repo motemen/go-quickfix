@@ -1,3 +1,9 @@
+/*
+The goquickfix command quick fixes Go source that is well typed but go refuses
+to compile e.g. "foo imported but not used".
+
+Run with -help flag for usage information.
+*/
 package main
 
 import (
@@ -26,7 +32,6 @@ Flags:`)
 	os.Exit(2)
 }
 
-// TODO: allow multiple args
 func main() {
 	flag.Usage = usage
 	flag.Parse()
@@ -47,7 +52,7 @@ func main() {
 
 		if fi.IsDir() {
 			if i != 0 {
-				die("you can only specify only one directory")
+				die("you can only specify exact one directory")
 			}
 
 			pkgs, err := parser.ParseDir(fset, arg, nil, parser.ParseComments)
