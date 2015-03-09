@@ -1,5 +1,5 @@
-// Package quickfix provides functions to rewrite Go AST
-// that is typed well but "go build" fails to pass building.
+// Package quickfix provides functions for fixing Go ASTs
+// that are well typed but "go build" refuses to build.
 package quickfix
 
 import (
@@ -27,7 +27,7 @@ var (
 //   "p" imported but not used           -> rewrite to `import _ "p"`
 //   no new variables on left side of := -> rewrite `:=` to `=`
 //
-// TODO hardMode, which removes errorneous code rather than adding
+// TODO implement hardMode, which removes errorneous code rather than adding
 func QuickFix(fset *token.FileSet, files []*ast.File) (err error) {
 	const maxTries = 10
 	for i := 0; i < maxTries; i++ {
@@ -35,6 +35,107 @@ func QuickFix(fset *token.FileSet, files []*ast.File) (err error) {
 		foundError, err = quickFix1(fset, files)
 		if !foundError {
 			return nil
+		}
+	}
+
+	return
+}
+
+type tracedVisitor struct {
+	path  []ast.Node
+	visit func(ast.Node, []ast.Node) bool
+}
+
+func (v tracedVisitor) Visit(node ast.Node) ast.Visitor {
+	if v.visit(node, v.path) {
+		return tracedVisitor{
+			path:  append([]ast.Node{node}, v.path...),
+			visit: v.visit,
+		}
+	}
+
+	return nil
+}
+
+func traverseAST(node ast.Node, visit func(ast.Node, []ast.Node) bool) {
+	v := tracedVisitor{
+		visit: visit,
+	}
+	ast.Walk(v, node)
+}
+
+// pkgsWithSideEffect are set of packages which are known to provide APIs by
+// blank identifier import (import _ "p").
+var pkgsWithSideEffect = map[string]bool{}
+
+func init() {
+	for _, path := range []string{
+		"expvar",
+		"image/gif",
+		"image/jpeg",
+		"image/png",
+		"net/http/pprof",
+		"unsafe",
+		"golang.org/x/image/bmp",
+		"golang.org/x/image/tiff",
+		"golang.org/x/image/vp8",
+		"golang.org/x/image/vp81",
+		"golang.org/x/image/webp",
+		"golang.org/x/tools/go/gcimporter",
+	} {
+		pkgsWithSideEffect[`"`+path+`"`] = true
+	}
+}
+
+// RevertQuickFix reverts possible quickfixes introduced by QuickFix.
+// This may result to non-buildable source, and cannot reproduce the original
+// code before first QuickFix.
+// For example:
+//   `_ = v`        -> removed
+//   `import _ "p"` -> rewritten to `import "p"`
+func RevertQuickFix(fset *token.FileSet, files []*ast.File) (err error) {
+	nodeToRemove := map[ast.Node]bool{}
+
+	for _, f := range files {
+		ast.Inspect(f, func(node ast.Node) bool {
+			if assign, ok := node.(*ast.AssignStmt); ok {
+				if len(assign.Lhs) == 1 && isBlankIdent(assign.Lhs[0]) &&
+					len(assign.Rhs) == 1 && isIdent(assign.Rhs[0]) {
+					// The statement is `_ = v`
+					nodeToRemove[node] = true
+				}
+
+				return false
+			} else if imp, ok := node.(*ast.ImportSpec); ok {
+				if isBlankIdent(imp.Name) && !pkgsWithSideEffect[imp.Path.Value] {
+					// The spec is `import _ "p"` and p is not a package that
+					// provides "side effects"
+					imp.Name = nil
+				}
+
+				return false
+			}
+
+			return true
+		})
+
+		for len(nodeToRemove) > 0 {
+			traverseAST(f, func(node ast.Node, nodepath []ast.Node) bool {
+				if nodeToRemove[node] {
+					parent := nodepath[0]
+					if removeChildNode(node, parent) == false {
+						err = fmt.Errorf(
+							"BUG: could not remove node: %s (in: %s)",
+							fset.Position(node.Pos()),
+							fset.Position(parent.Pos()),
+						)
+					}
+					delete(nodeToRemove, node)
+					return false
+				}
+
+				return true
+			})
 		}
 	}
 
@@ -216,6 +317,41 @@ func appendStmt(nodepath []ast.Node, stmt ast.Stmt) bool {
 	return false
 }
 
+func removeChildNode(child, parent ast.Node) bool {
+	switch parent := parent.(type) {
+	case *ast.BlockStmt:
+		removeFromStmtList(child, parent.List)
+		return true
+	case *ast.CaseClause:
+		removeFromStmtList(child, parent.Body)
+		return true
+	case *ast.CommClause:
+		removeFromStmtList(child, parent.Body)
+		return true
+	case *ast.RangeStmt:
+		removeFromStmtList(child, parent.Body.List)
+		return true
+	}
+
+	return false
+}
+
+// removeFromStmtList remove node from slice of statements list. This function
+// modifies list in-place and pads rest of the slice with ast.EmptyStmt.
+func removeFromStmtList(node ast.Node, list []ast.Stmt) bool {
+	for i, s := range list {
+		if s == node {
+			for ; i < len(list)-1; i++ {
+				list[i] = list[i+1]
+			}
+			list[len(list)-1] = &ast.EmptyStmt{}
+			return true
+		}
+	}
+
+	return false
+}
+
 func findFile(files []*ast.File, pos token.Pos) *ast.File {
 	for _, f := range files {
 		if f.Pos() <= pos && pos < f.End() {
@@ -224,4 +360,22 @@ func findFile(files []*ast.File, pos token.Pos) *ast.File {
 	}
 
 	return nil
+}
+
+func isIdent(node ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	_, ok := node.(*ast.Ident)
+	return ok
+}
+
+func isBlankIdent(node ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	ident, ok := node.(*ast.Ident)
+	return ok && ident != nil && ident.Name == "_"
 }

@@ -8,6 +8,7 @@ import (
 	"go/printer"
 	"go/token"
 	"golang.org/x/tools/go/types"
+	"strings"
 	"testing"
 )
 
@@ -69,11 +70,41 @@ func TestQuickFix_RangeStmt(t *testing.T) {
 	}
 }
 
+func TestRevertQuickFix_BlankAssign(t *testing.T) {
+	fset, files, err := loadTestData("revert")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = RevertQuickFix(fset, files)
+	if err != nil {
+		t.Fatalf("RevertQuickFix(): %s", err)
+	}
+
+	if strings.Contains(fileContent(fset, files[0]), `_ = `) {
+		t.Fatal("assignments to blank identifiers should be removed")
+	}
+
+	if !strings.Contains(fileContent(fset, files[0]), `import "fmt"`) {
+		t.Fatal("quickfixes to blank imports should be reverted")
+	}
+
+	if !strings.Contains(fileContent(fset, files[0]), `import _ "image/png"`) {
+		t.Fatal("imports of packages with side effects should not be considered as quickfixed")
+	}
+
+	logFiles(t, fset, files)
+}
+
 func logFiles(t *testing.T, fset *token.FileSet, files []*ast.File) {
 	for _, f := range files {
-		var buf bytes.Buffer
-		printer.Fprint(&buf, fset, f)
 		t.Log("#", fset.File(f.Pos()).Name())
-		t.Log(buf.String())
+		t.Log(fileContent(fset, f))
 	}
+}
+
+func fileContent(fset *token.FileSet, f *ast.File) string {
+	var buf bytes.Buffer
+	printer.Fprint(&buf, fset, f)
+	return buf.String()
 }
