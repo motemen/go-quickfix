@@ -19,4 +19,3 @@ go refuses to compile e.g. "foo imported but not used".
 
 * `-d` option to show diffs
 * `-hard=true` option to remove erroneous code rather than adding new code
-* no writing on no diffs

@@ -7,9 +7,13 @@ Run with -help flag for usage information.
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"go/ast"
 	"go/parser"
@@ -41,8 +45,7 @@ func main() {
 		flag.Usage()
 	}
 
-	// list of files grouped by package.
-	files := map[string][]*ast.File{}
+	fileContents := map[string]string{}
 
 	fset := token.NewFileSet()
 
@@ -56,57 +59,86 @@ func main() {
 				die("you can only specify exact one directory")
 			}
 
-			pkgs, err := parser.ParseDir(fset, arg, nil, parser.ParseComments)
+			fis, err := ioutil.ReadDir(arg)
 			dieIf(err)
 
-			for _, pkg := range pkgs {
-				ff := make([]*ast.File, 0, len(pkg.Files))
-				for _, f := range pkg.Files {
-					ff = append(ff, f)
+			for _, fi := range fis {
+				if fi.IsDir() {
+					continue
 				}
-				files[pkg.Name] = ff
+
+				name := fi.Name()
+				if !strings.HasSuffix(name, ".go") {
+					continue
+				}
+				if name[0] == '_' || name[0] == '.' {
+					continue
+				}
+
+				filename := filepath.Join(arg, name)
+				b, err := ioutil.ReadFile(filename)
+				dieIf(err)
+
+				fileContents[filename] = string(b)
 			}
 		} else {
-			f, err := parser.ParseFile(fset, arg, nil, parser.ParseComments)
+			b, err := ioutil.ReadFile(arg)
 			dieIf(err)
 
-			const adhocPkg = ""
-
-			// *.go files are grouped as ad-hoc package.
-			if files[adhocPkg] == nil {
-				files[adhocPkg] = []*ast.File{}
-			}
-
-			files[adhocPkg] = append(files[adhocPkg], f)
+			fileContents[arg] = string(b)
 		}
 
 	}
 
-	for _, ff := range files {
-		var err error
-		if *flagRevert {
-			err = quickfix.RevertQuickFix(fset, ff)
-		} else {
-			err = quickfix.QuickFix(fset, ff)
+	ff, err := parseFiles(fset, fileContents)
+	dieIf(err)
+
+	if *flagRevert {
+		err = quickfix.RevertQuickFix(fset, ff)
+	} else {
+		err = quickfix.QuickFix(fset, ff)
+	}
+	dieIf(err)
+
+	for _, f := range ff {
+		filename := fset.File(f.Pos()).Name()
+
+		var buf bytes.Buffer
+		conf := printer.Config{
+			Tabwidth: 8,
+			Mode:     printer.UseSpaces | printer.TabIndent,
 		}
+		err := conf.Fprint(&buf, fset, f)
 		dieIf(err)
 
-		for _, f := range ff {
-			// TODO: do not write if no change
-			out := os.Stdout
-			if *flagWrite {
-				out, err = os.Create(fset.File(f.Pos()).Name())
-				dieIf(err)
-			}
+		if buf.String() == fileContents[filename] {
+			// no change, skip this file
+			continue
+		}
 
-			conf := printer.Config{
-				Tabwidth: 8,
-				Mode:     printer.UseSpaces | printer.TabIndent,
-			}
-			err := conf.Fprint(out, fset, f)
+		out := os.Stdout
+		if *flagWrite {
+			out, err = os.Create(filename)
 			dieIf(err)
 		}
+
+		buf.WriteTo(out)
 	}
+}
+
+func parseFiles(fset *token.FileSet, fileContents map[string]string) ([]*ast.File, error) {
+	files := make([]*ast.File, 0, len(fileContents))
+
+	for filename, content := range fileContents {
+		f, err := parser.ParseFile(fset, filename, content, parser.ParseComments)
+		if err != nil {
+			return nil, err
+		}
+
+		files = append(files, f)
+	}
+
+	return files, nil
 }
 
 func dieIf(err error) {
