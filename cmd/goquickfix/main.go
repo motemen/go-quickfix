@@ -20,12 +20,13 @@ import (
 )
 
 var (
-	flagWrite = flag.Bool("w", false, "write result to (source) file instead of stdout")
+	flagWrite  = flag.Bool("w", false, "write result to (source) file instead of stdout")
+	flagRevert = flag.Bool("revert", false, "try to revert possible quickfixes introduced by goquickfix")
 )
 
 func usage() {
 	fmt.Fprintln(os.Stderr, `Usage:
-  goquickfix [-w] <path>
+  goquickfix [-w] [-revert] <path>...
 
 Flags:`)
 	flag.PrintDefaults()
@@ -82,7 +83,12 @@ func main() {
 	}
 
 	for _, ff := range files {
-		err := quickfix.QuickFix(fset, ff)
+		var err error
+		if *flagRevert {
+			err = quickfix.RevertQuickFix(fset, ff)
+		} else {
+			err = quickfix.QuickFix(fset, ff)
+		}
 		dieIf(err)
 
 		for _, f := range ff {
