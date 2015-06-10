@@ -21,6 +21,22 @@ var (
 	noNewVariablesOnDefine = "no new variables on left side of :="
 )
 
+type Config struct {
+	Fset     *token.FileSet
+	Files    []*ast.File
+	TypeInfo *types.Info
+	MaxTries int
+}
+
+func QuickFix(fset *token.FileSet, files []*ast.File) (err error) {
+	config := Config{
+		Fset:     fset,
+		Files:    files,
+		MaxTries: 10,
+	}
+	return config.QuickFix()
+}
+
 // QuickFix rewrites AST files of same package so that they pass go build.
 // For example:
 //   v declared but not used             -> append `_ = v`
@@ -28,11 +44,14 @@ var (
 //   no new variables on left side of := -> rewrite `:=` to `=`
 //
 // TODO implement hardMode, which removes errorneous code rather than adding
-func QuickFix(fset *token.FileSet, files []*ast.File) (err error) {
-	const maxTries = 10
+func (c Config) QuickFix() (err error) {
+	maxTries := 10
+	if c.MaxTries > 0 {
+		maxTries = c.MaxTries
+	}
 	for i := 0; i < maxTries; i++ {
 		var foundError bool
-		foundError, err = quickFix1(fset, files)
+		foundError, err = c.QuickFixOnce()
 		if !foundError {
 			return nil
 		}
@@ -87,13 +106,25 @@ func init() {
 	}
 }
 
+func RevertQuickFix(fset *token.FileSet, files []*ast.File) error {
+	config := Config{
+		Fset:     fset,
+		Files:    files,
+		MaxTries: 10,
+	}
+	return config.RevertQuickFix()
+}
+
 // RevertQuickFix reverts possible quickfixes introduced by QuickFix.
 // This may result to non-buildable source, and cannot reproduce the original
-// code before first QuickFix.
+// code before prior QuickFix.
 // For example:
 //   `_ = v`        -> removed
 //   `import _ "p"` -> rewritten to `import "p"`
-func RevertQuickFix(fset *token.FileSet, files []*ast.File) (err error) {
+func (c Config) RevertQuickFix() (err error) {
+	fset := c.Fset
+	files := c.Files
+
 	nodeToRemove := map[ast.Node]bool{}
 
 	for _, f := range files {
@@ -142,7 +173,10 @@ func RevertQuickFix(fset *token.FileSet, files []*ast.File) (err error) {
 	return
 }
 
-func quickFix1(fset *token.FileSet, files []*ast.File) (bool, error) {
+func (c Config) QuickFixOnce() (bool, error) {
+	fset := c.Fset
+	files := c.Files
+
 	errs := []error{}
 	config := &types.Config{
 		Error: func(err error) {
@@ -150,7 +184,7 @@ func quickFix1(fset *token.FileSet, files []*ast.File) (bool, error) {
 		},
 	}
 
-	_, err := config.Check("_quickfix", fset, files, nil)
+	_, err := config.Check("_quickfix", fset, files, c.TypeInfo)
 	if err == nil {
 		return false, nil
 	}
@@ -168,7 +202,7 @@ func quickFix1(fset *token.FileSet, files []*ast.File) (bool, error) {
 			continue
 		}
 
-		f := findFile(files, err.Pos)
+		f := findFile(c.Files, err.Pos)
 		if f == nil {
 			e := ErrCouldNotLocate{
 				Err:  err,
