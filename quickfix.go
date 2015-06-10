@@ -157,7 +157,7 @@ func quickFix1(fset *token.FileSet, files []*ast.File) (bool, error) {
 
 	// apply fixes on AST later so that we won't break funcs that inspect AST by positions
 	fixes := map[error]func() bool{}
-	unhandled := errorList{}
+	unhandled := ErrorList{}
 
 	foundError := len(errs) > 0
 
@@ -262,9 +262,9 @@ func fixNoNewVariables(nodepath []ast.Node) bool {
 	return false
 }
 
-type errorList []error
+type ErrorList []error
 
-func (errs errorList) any() error {
+func (errs ErrorList) any() error {
 	if len(errs) == 0 {
 		return nil
 	}
@@ -272,7 +272,7 @@ func (errs errorList) any() error {
 	return errs
 }
 
-func (errs errorList) Error() string {
+func (errs ErrorList) Error() string {
 	s := []string{fmt.Sprintf("%d error(s):", len(errs))}
 	for _, e := range errs {
 		s = append(s, fmt.Sprintf("- %s", e))
