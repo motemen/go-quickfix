@@ -170,8 +170,11 @@ func quickFix1(fset *token.FileSet, files []*ast.File) (bool, error) {
 
 		f := findFile(files, err.Pos)
 		if f == nil {
-			err := fmt.Errorf("cannot find file for error %q: %s (%d)", err.Error(), fset.Position(err.Pos), err.Pos)
-			unhandled = append(unhandled, err)
+			e := ErrCouldNotLocate{
+				Err:  err,
+				Fset: fset,
+			}
+			unhandled = append(unhandled, e)
 			continue
 		}
 
@@ -378,4 +381,13 @@ func isBlankIdent(node ast.Node) bool {
 
 	ident, ok := node.(*ast.Ident)
 	return ok && ident != nil && ident.Name == "_"
+}
+
+type ErrCouldNotLocate struct {
+	Err  types.Error
+	Fset *token.FileSet
+}
+
+func (e ErrCouldNotLocate) Error() string {
+	return fmt.Sprintf("cannot find file for error %q: %s (%d)", e.Err.Error(), e.Fset.Position(e.Err.Pos), e.Err.Pos)
 }
