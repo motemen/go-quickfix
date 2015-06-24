@@ -18,6 +18,7 @@ import (
 var (
 	declaredNotUsed        = regexp.MustCompile(`^([a-zA-Z0-9_]+) declared but not used$`)
 	importedNotUsed        = regexp.MustCompile(`^(".+") imported but not used$`)
+	expressionIsNotUsed    = regexp.MustCompile(` is not used$`)
 	noNewVariablesOnDefine = "no new variables on left side of :="
 )
 
@@ -220,6 +221,9 @@ func (c Config) QuickFixOnce() (bool, error) {
 		// - "%q imported but not used"
 		// - "label %s declared but not used" TODO
 		// - "no new variables on left side of :="
+		// - "is not used"
+		// - "must be called" TODO
+		// ref. go/types.Checker.stmt()
 		if m := declaredNotUsed.FindStringSubmatch(err.Msg); m != nil {
 			identName := m[1]
 			fix = func() bool {
@@ -233,6 +237,10 @@ func (c Config) QuickFixOnce() (bool, error) {
 		} else if err.Msg == noNewVariablesOnDefine {
 			fix = func() bool {
 				return fixNoNewVariables(nodepath)
+			}
+		} else if expressionIsNotUsed.MatchString(err.Msg) {
+			fix = func() bool {
+				return fixExpressionIsNotUsed(nodepath)
 			}
 		} else {
 			unhandled = append(unhandled, err)
@@ -296,6 +304,46 @@ func fixNoNewVariables(nodepath []ast.Node) bool {
 	return false
 }
 
+func fixExpressionIsNotUsed(nodepath []ast.Node) bool {
+	var replaced bool
+
+	var targetStmt *ast.ExprStmt
+	for _, node := range nodepath {
+		if exprStmt, ok := node.(*ast.ExprStmt); ok {
+			targetStmt = exprStmt
+			break
+		}
+	}
+
+	if targetStmt == nil {
+		return false
+	}
+
+	replaceStmtInList(
+		nodepath,
+		func(stmt ast.Stmt) ast.Stmt {
+			exprStmt, ok := stmt.(*ast.ExprStmt)
+			if !ok {
+				return stmt
+			}
+
+			if exprStmt != targetStmt {
+				return stmt
+			}
+
+			replaced = true
+
+			return &ast.AssignStmt{
+				Lhs: []ast.Expr{ast.NewIdent("_")},
+				Tok: token.ASSIGN,
+				Rhs: []ast.Expr{exprStmt.X},
+			}
+		},
+	)
+
+	return replaced
+}
+
 type ErrorList []error
 
 func (errs ErrorList) any() error {
@@ -343,6 +391,54 @@ func appendStmt(nodepath []ast.Node, stmt ast.Stmt) bool {
 				node.Body.List = []ast.Stmt{}
 			}
 			node.Body.List = append(node.Body.List, stmt)
+
+		default:
+			continue
+		}
+
+		return true
+	}
+
+	return false
+}
+
+func replaceStmtInList(nodepath []ast.Node, cb func(stmt ast.Stmt) ast.Stmt) bool {
+	replaceList := func(list []ast.Stmt) []ast.Stmt {
+		newList := make([]ast.Stmt, len(list))
+		for i, stmt := range list {
+			newList[i] = cb(stmt)
+		}
+		return newList
+	}
+
+	for _, node := range nodepath {
+		switch node := node.(type) {
+		case *ast.BlockStmt:
+			if node.List == nil {
+				continue
+			}
+			node.List = replaceList(node.List)
+
+		case *ast.CaseClause:
+			if node.Body == nil {
+				continue
+			}
+			node.Body = replaceList(node.Body)
+
+		case *ast.CommClause:
+			if node.Body == nil {
+				continue
+			}
+			node.Body = replaceList(node.Body)
+
+		case *ast.RangeStmt:
+			if node.Body == nil {
+				continue
+			}
+			if node.Body.List == nil {
+				continue
+			}
+			node.Body.List = replaceList(node.Body.List)
 
 		default:
 			continue
