@@ -96,6 +96,25 @@ func TestRevertQuickFix_BlankAssign(t *testing.T) {
 	logFiles(t, fset, files)
 }
 
+func TestQuickFix_ExpressionIsNotUsed(t *testing.T) {
+	fset, files, err := loadTestData("expressionnotused")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = QuickFix(fset, files)
+	if err != nil {
+		t.Fatalf("QuickFix(): %s", err)
+	}
+
+	logFiles(t, fset, files)
+
+	_, err = types.Check("testdata/expressionnotused", fset, files)
+	if err != nil {
+		t.Fatalf("should pass type checking: %s", err)
+	}
+}
+
 func logFiles(t *testing.T, fset *token.FileSet, files []*ast.File) {
 	for _, f := range files {
 		t.Log("#", fset.File(f.Pos()).Name())
