@@ -17,7 +17,7 @@ import (
 
 var (
 	declaredNotUsed        = regexp.MustCompile(`^([a-zA-Z0-9_]+) declared but not used$`)
-	importedNotUsed        = regexp.MustCompile(`^(".+") imported but not used$`)
+	importedNotUsed        = regexp.MustCompile(`^(".+") imported but not used`)
 	noNewVariablesOnDefine = "no new variables on left side of :="
 )
 
@@ -217,7 +217,7 @@ func (c Config) QuickFixOnce() (bool, error) {
 		var fix func() bool
 
 		// - "%s declared but not used"
-		// - "%q imported but not used"
+		// - "%q imported but not used" (+ " as %s")
 		// - "label %s declared but not used" TODO
 		// - "no new variables on left side of :="
 		if m := declaredNotUsed.FindStringSubmatch(err.Msg); m != nil {
