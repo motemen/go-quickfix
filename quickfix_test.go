@@ -12,62 +12,12 @@ import (
 	"testing"
 )
 
-func loadTestData(pkgName string) (*token.FileSet, []*ast.File, error) {
-	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, "testdata/"+pkgName, nil, parser.Mode(0))
-	if err != nil {
-		return nil, nil, err
-	}
-
-	pkg, ok := pkgs[pkgName]
-	if !ok {
-		return nil, nil, fmt.Errorf("package %s not found: %v", pkgName, pkgs)
-	}
-
-	files := make([]*ast.File, 0, len(pkg.Files))
-	for _, f := range pkg.Files {
-		files = append(files, f)
-	}
-
-	return fset, files, nil
-}
-
 func TestQuickFix_General(t *testing.T) {
-	fset, files, err := loadTestData("general")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = QuickFix(fset, files)
-	if err != nil {
-		t.Fatalf("QuickFix(): %s", err)
-	}
-
-	logFiles(t, fset, files)
-
-	_, err = types.Check("testdata/general", fset, files)
-	if err != nil {
-		t.Fatalf("should pass type checking: %s", err)
-	}
+	checkCorrectness(t, "general")
 }
 
 func TestQuickFix_RangeStmt(t *testing.T) {
-	fset, files, err := loadTestData("rangestmt")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = QuickFix(fset, files)
-	if err != nil {
-		t.Fatalf("QuickFix(): %s", err)
-	}
-
-	logFiles(t, fset, files)
-
-	_, err = types.Check("testdata/rangestmt", fset, files)
-	if err != nil {
-		t.Fatalf("should pass type checking: %s", err)
-	}
+	checkCorrectness(t, "rangestmt")
 }
 
 func TestRevertQuickFix_BlankAssign(t *testing.T) {
@@ -94,6 +44,49 @@ func TestRevertQuickFix_BlankAssign(t *testing.T) {
 	}
 
 	logFiles(t, fset, files)
+}
+
+func TestImportName(t *testing.T) {
+	checkCorrectness(t, "importname")
+}
+
+func loadTestData(pkgName string) (*token.FileSet, []*ast.File, error) {
+	fset := token.NewFileSet()
+	pkgs, err := parser.ParseDir(fset, "testdata/"+pkgName, nil, parser.Mode(0))
+	if err != nil {
+		return nil, nil, err
+	}
+
+	pkg, ok := pkgs[pkgName]
+	if !ok {
+		return nil, nil, fmt.Errorf("package %s not found: %v", pkgName, pkgs)
+	}
+
+	files := make([]*ast.File, 0, len(pkg.Files))
+	for _, f := range pkg.Files {
+		files = append(files, f)
+	}
+
+	return fset, files, nil
+}
+
+func checkCorrectness(t *testing.T, testName string) {
+	fset, files, err := loadTestData(testName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = QuickFix(fset, files)
+	if err != nil {
+		t.Fatalf("QuickFix(): %s", err)
+	}
+
+	logFiles(t, fset, files)
+
+	_, err = types.Check("testdata/"+testName, fset, files)
+	if err != nil {
+		t.Fatalf("should pass type checking: %s", err)
+	}
 }
 
 func logFiles(t *testing.T, fset *token.FileSet, files []*ast.File) {
