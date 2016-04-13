@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
+	"go/importer"
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"golang.org/x/tools/go/types"
+	"go/types"
 	"strings"
 	"testing"
 )
@@ -83,7 +84,8 @@ func checkCorrectness(t *testing.T, testName string) {
 
 	logFiles(t, fset, files)
 
-	_, err = types.Check("testdata/"+testName, fset, files)
+	config := types.Config{Importer: importer.Default()}
+	_, err = config.Check("testdata/"+testName, fset, files, nil)
 	if err != nil {
 		t.Fatalf("should pass type checking: %s", err)
 	}

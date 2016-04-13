@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"go/ast"
+	"go/importer"
 	"go/token"
+	"go/types"
 
 	"golang.org/x/tools/go/ast/astutil"
-	_ "golang.org/x/tools/go/gcimporter"
-	"golang.org/x/tools/go/types"
 )
 
 var (
@@ -182,6 +182,7 @@ func (c Config) QuickFixOnce() (bool, error) {
 		Error: func(err error) {
 			errs = append(errs, err)
 		},
+		Importer: importer.Default(),
 	}
 
 	_, err := config.Check("_quickfix", fset, files, c.TypeInfo)
