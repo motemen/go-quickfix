@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"go/ast"
-	"go/importer"
 	"go/token"
 	"go/types"
 
 	"golang.org/x/tools/go/ast/astutil"
+	"golang.org/x/tools/go/packages"
 )
 
 var (
@@ -173,6 +173,22 @@ func (c Config) RevertQuickFix() (err error) {
 	return
 }
 
+type pkgsImporter struct{}
+
+func (i pkgsImporter) Import(path string) (*types.Package, error) {
+	mode := packages.NeedTypes | packages.NeedImports | packages.NeedDeps
+	pkgs, err := packages.Load(&packages.Config{Mode: mode}, path)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(pkgs) == 0 {
+		return nil, fmt.Errorf("path %s not found", path)
+	}
+
+	return pkgs[0].Types, nil
+}
+
 func (c Config) QuickFixOnce() (bool, error) {
 	fset := c.Fset
 	files := c.Files
@@ -182,7 +198,7 @@ func (c Config) QuickFixOnce() (bool, error) {
 		Error: func(err error) {
 			errs = append(errs, err)
 		},
-		Importer: importer.Default(),
+		Importer: pkgsImporter{},
 	}
 
 	_, err := config.Check("_quickfix", fset, files, c.TypeInfo)
