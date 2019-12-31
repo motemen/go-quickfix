@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"fmt"
 	"go/ast"
-	"go/importer"
 	"go/parser"
 	"go/printer"
 	"go/token"
 	"go/types"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -22,7 +22,7 @@ func TestQuickFix_RangeStmt(t *testing.T) {
 }
 
 func TestRevertQuickFix_BlankAssign(t *testing.T) {
-	fset, files, err := loadTestData("revert")
+	fset, files, _, err := loadTestData("revert")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,16 +51,17 @@ func TestImportName(t *testing.T) {
 	checkCorrectness(t, "importname")
 }
 
-func loadTestData(pkgName string) (*token.FileSet, []*ast.File, error) {
+func loadTestData(pkgName string) (*token.FileSet, []*ast.File, string, error) {
 	fset := token.NewFileSet()
-	pkgs, err := parser.ParseDir(fset, "testdata/"+pkgName, nil, parser.Mode(0))
+	dir := filepath.Join("testdata", pkgName)
+	pkgs, err := parser.ParseDir(fset, dir, nil, parser.Mode(0))
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, "", err
 	}
 
 	pkg, ok := pkgs[pkgName]
 	if !ok {
-		return nil, nil, fmt.Errorf("package %s not found: %v", pkgName, pkgs)
+		return nil, nil, "", fmt.Errorf("package %s not found: %v", pkgName, pkgs)
 	}
 
 	files := make([]*ast.File, 0, len(pkg.Files))
@@ -68,24 +69,30 @@ func loadTestData(pkgName string) (*token.FileSet, []*ast.File, error) {
 		files = append(files, f)
 	}
 
-	return fset, files, nil
+	return fset, files, dir, nil
 }
 
 func checkCorrectness(t *testing.T, testName string) {
-	fset, files, err := loadTestData(testName)
+	fset, files, dir, err := loadTestData(testName)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = QuickFix(fset, files)
+	qfconfig := Config{
+		Fset:     fset,
+		Files:    files,
+		Dir:      dir,
+		MaxTries: 10,
+	}
+	err = qfconfig.QuickFix()
 	if err != nil {
 		t.Fatalf("QuickFix(): %s", err)
 	}
 
 	logFiles(t, fset, files)
 
-	config := types.Config{Importer: importer.Default()}
-	_, err = config.Check("testdata/"+testName, fset, files, nil)
+	config := &types.Config{Importer: pkgsImporter{dir: dir}}
+	_, err = config.Check(dir, fset, files, nil)
 	if err != nil {
 		t.Fatalf("should pass type checking: %s", err)
 	}
