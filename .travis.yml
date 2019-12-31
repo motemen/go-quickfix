@@ -5,4 +5,5 @@ go:
   - '1.13'
 
 script:
-  - go test -v ./...
+  - make test
+  - make lint
