@@ -1,8 +1,8 @@
 language: go
+
 go:
-  - 1.5
-  - 1.6
-  - tip
-install:
-  - go get ./...
-  - go get -t ./...
+  - '1.12'
+  - '1.13'
+
+script:
+  - go test -v ./...
