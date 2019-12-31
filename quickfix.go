@@ -24,6 +24,7 @@ var (
 type Config struct {
 	Fset     *token.FileSet
 	Files    []*ast.File
+	Dir      string
 	TypeInfo *types.Info
 	MaxTries int
 }
@@ -173,11 +174,16 @@ func (c Config) RevertQuickFix() (err error) {
 	return
 }
 
-type pkgsImporter struct{}
+type pkgsImporter struct {
+	dir string
+}
 
 func (i pkgsImporter) Import(path string) (*types.Package, error) {
 	mode := packages.NeedTypes | packages.NeedImports | packages.NeedDeps
-	pkgs, err := packages.Load(&packages.Config{Mode: mode}, path)
+	pkgs, err := packages.Load(&packages.Config{
+		Mode: mode,
+		Dir:  i.dir,
+	}, path)
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +204,7 @@ func (c Config) QuickFixOnce() (bool, error) {
 		Error: func(err error) {
 			errs = append(errs, err)
 		},
-		Importer: pkgsImporter{},
+		Importer: pkgsImporter{dir: c.Dir},
 	}
 
 	_, err := config.Check("_quickfix", fset, files, c.TypeInfo)
