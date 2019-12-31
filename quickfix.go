@@ -21,6 +21,7 @@ var (
 	noNewVariablesOnDefine = "no new variables on left side of :="
 )
 
+// Config for quickfix.
 type Config struct {
 	Fset     *token.FileSet
 	Files    []*ast.File
@@ -29,7 +30,8 @@ type Config struct {
 	MaxTries int
 }
 
-func QuickFix(fset *token.FileSet, files []*ast.File) (err error) {
+// QuickFix a file set.
+func QuickFix(fset *token.FileSet, files []*ast.File) error {
 	config := Config{
 		Fset:     fset,
 		Files:    files,
@@ -107,6 +109,7 @@ func init() {
 	}
 }
 
+// RevertQuickFix a file set.
 func RevertQuickFix(fset *token.FileSet, files []*ast.File) error {
 	config := Config{
 		Fset:     fset,
@@ -195,6 +198,7 @@ func (i pkgsImporter) Import(path string) (*types.Package, error) {
 	return pkgs[0].Types, nil
 }
 
+// QuickFixOnce apply the fixes once.
 func (c Config) QuickFixOnce() (bool, error) {
 	fset := c.Fset
 	files := c.Files
@@ -319,6 +323,7 @@ func fixNoNewVariables(nodepath []ast.Node) bool {
 	return false
 }
 
+// ErrorList represents a collection of errors.
 type ErrorList []error
 
 func (errs ErrorList) any() error {
@@ -440,6 +445,7 @@ func isBlankIdent(node ast.Node) bool {
 	return ok && ident != nil && ident.Name == "_"
 }
 
+// ErrCouldNotLocate represents a file not found error.
 type ErrCouldNotLocate struct {
 	Err  types.Error
 	Fset *token.FileSet
