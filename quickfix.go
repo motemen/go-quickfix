@@ -182,9 +182,8 @@ type pkgsImporter struct {
 }
 
 func (i pkgsImporter) Import(path string) (*types.Package, error) {
-	mode := packages.NeedTypes | packages.NeedImports | packages.NeedDeps
 	pkgs, err := packages.Load(&packages.Config{
-		Mode: mode,
+		Mode: packages.NeedTypes,
 		Dir:  i.dir,
 	}, path)
 	if err != nil {
