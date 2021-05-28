@@ -1,4 +1,4 @@
-= goquickfix image:https://travis-ci.org/motemen/go-quickfix.svg?branch=master["Build Status", link="https://travis-ci.org/motemen/go-quickfix"] image:http://godoc.org/github.com/motemen/go-quickfix?status.svg["GoDoc", link="http://godoc.org/github.com/motemen/go-quickfix"] image:http://gocover.io/_badge/github.com/motemen/go-quickfix["Test Coverage", link="http://gocover.io/github.com/motemen/go-quickfix"]
+= goquickfix image:https://github.com/motemen/go-quickfix/workflows/CI/badge.svg["CI Status", link="https://github.com/motemen/go-quickfix/actions"] image:https://pkg.go.dev/badge/github.com/motemen/go-quickfix["go.pkg.dev", link="https://pkg.go.dev/github.com/motemen/go-quickfix"] image:http://gocover.io/_badge/github.com/motemen/go-quickfix["Test Coverage", link="http://gocover.io/github.com/motemen/go-quickfix"]
 
 The goquickfix command quick fixes Go source that is well typed but
 Go refuses to compile e.g. "x declared and not used".
