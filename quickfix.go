@@ -4,12 +4,11 @@ package quickfix
 
 import (
 	"fmt"
-	"regexp"
-	"strings"
-
 	"go/ast"
 	"go/token"
 	"go/types"
+	"regexp"
+	"strings"
 
 	"golang.org/x/tools/go/ast/astutil"
 	"golang.org/x/tools/go/packages"

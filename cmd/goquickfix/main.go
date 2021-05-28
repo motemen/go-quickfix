@@ -10,15 +10,14 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
-	"strings"
-
 	"go/ast"
 	"go/parser"
 	"go/printer"
 	"go/token"
+	"io/ioutil"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/motemen/go-quickfix"
 )
