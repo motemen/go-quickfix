@@ -157,7 +157,7 @@ func (c Config) RevertQuickFix() (err error) {
 			traverseAST(f, func(node ast.Node, nodepath []ast.Node) bool {
 				if nodeToRemove[node] {
 					parent := nodepath[0]
-					if removeChildNode(node, parent) == false {
+					if !removeChildNode(node, parent) {
 						err = fmt.Errorf(
 							"BUG: could not remove node: %s (in: %s)",
 							fset.Position(node.Pos()),
@@ -269,7 +269,7 @@ func (c Config) QuickFixOnce() (bool, error) {
 	}
 
 	for err, fix := range fixes {
-		if fix() == false {
+		if !fix() {
 			unhandled = append(unhandled, err)
 		}
 	}

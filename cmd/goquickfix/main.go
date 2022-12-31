@@ -14,7 +14,6 @@ import (
 	"go/parser"
 	"go/printer"
 	"go/token"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -58,7 +57,7 @@ func main() {
 				die("you can only specify exact one directory")
 			}
 
-			fis, err := ioutil.ReadDir(arg)
+			fis, err := os.ReadDir(arg)
 			dieIf(err)
 
 			for _, fi := range fis {
@@ -75,13 +74,13 @@ func main() {
 				}
 
 				filename := filepath.Join(arg, name)
-				b, err := ioutil.ReadFile(filename)
+				b, err := os.ReadFile(filename)
 				dieIf(err)
 
 				fileContents[filename] = string(b)
 			}
 		} else {
-			b, err := ioutil.ReadFile(arg)
+			b, err := os.ReadFile(arg)
 			dieIf(err)
 
 			fileContents[arg] = string(b)
