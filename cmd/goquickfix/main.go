@@ -8,6 +8,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"go/ast"
@@ -36,6 +37,13 @@ Flags:`)
 }
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	flag.Usage = usage
 	flag.Parse()
 
@@ -50,15 +58,19 @@ func main() {
 	for i := 0; i < flag.NArg(); i++ {
 		arg := flag.Arg(i)
 		fi, err := os.Stat(arg)
-		dieIf(err)
+		if err != nil {
+			return err
+		}
 
 		if fi.IsDir() {
 			if i != 0 {
-				die("you can only specify exact one directory")
+				return errors.New("you can only specify exact one directory")
 			}
 
 			fis, err := os.ReadDir(arg)
-			dieIf(err)
+			if err != nil {
+				return err
+			}
 
 			for _, fi := range fis {
 				if fi.IsDir() {
@@ -75,13 +87,17 @@ func main() {
 
 				filename := filepath.Join(arg, name)
 				b, err := os.ReadFile(filename)
-				dieIf(err)
+				if err != nil {
+					return err
+				}
 
 				fileContents[filename] = string(b)
 			}
 		} else {
 			b, err := os.ReadFile(arg)
-			dieIf(err)
+			if err != nil {
+				return err
+			}
 
 			fileContents[arg] = string(b)
 		}
@@ -89,14 +105,18 @@ func main() {
 	}
 
 	ff, err := parseFiles(fset, fileContents)
-	dieIf(err)
+	if err != nil {
+		return err
+	}
 
 	if *flagRevert {
 		err = quickfix.RevertQuickFix(fset, ff)
 	} else {
 		err = quickfix.QuickFix(fset, ff)
 	}
-	dieIf(err)
+	if err != nil {
+		return err
+	}
 
 	for _, f := range ff {
 		filename := fset.File(f.Pos()).Name()
@@ -106,8 +126,9 @@ func main() {
 			Tabwidth: 8,
 			Mode:     printer.UseSpaces | printer.TabIndent,
 		}
-		err := conf.Fprint(&buf, fset, f)
-		dieIf(err)
+		if err := conf.Fprint(&buf, fset, f); err != nil {
+			return err
+		}
 
 		if buf.String() == fileContents[filename] {
 			// no change, skip this file
@@ -116,12 +137,15 @@ func main() {
 
 		out := os.Stdout
 		if *flagWrite {
-			out, err = os.Create(filename)
-			dieIf(err)
+			if out, err = os.Create(filename); err != nil {
+				return err
+			}
 		}
 
 		buf.WriteTo(out)
 	}
+
+	return nil
 }
 
 func parseFiles(fset *token.FileSet, fileContents map[string]string) ([]*ast.File, error) {
@@ -137,15 +161,4 @@ func parseFiles(fset *token.FileSet, fileContents map[string]string) ([]*ast.Fil
 	}
 
 	return files, nil
-}
-
-func dieIf(err error) {
-	if err != nil {
-		die(err)
-	}
-}
-
-func die(msg interface{}) {
-	fmt.Fprintln(os.Stderr, msg)
-	os.Exit(1)
 }
