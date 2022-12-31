@@ -15,7 +15,7 @@ func F() {
 
 	switch b {
 	default:
-		var x interface{}
+		var x any
 	}
 
 	select {
