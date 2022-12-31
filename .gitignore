@@ -1,1 +1,4 @@
 /goquickfix
+*.exe
+*.test
+*.out
