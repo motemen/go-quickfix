@@ -1,29 +1,28 @@
 BIN := goquickfix
 GOBIN ?= $(shell go env GOPATH)/bin
-export GO111MODULE=on
 
 .PHONY: all
 all: build
 
 .PHONY: build
 build:
-	go build -o $(BIN) ./cmd/...
+	go build -o $(BIN) ./cmd/$(BIN)
 
 .PHONY: install
 install:
-	go install ./cmd/...
+	go install ./cmd/$(BIN)
 
 .PHONY: test
 test: build
-	go test -v ./...
+	go test -v -race ./...
 
 .PHONY: lint
-lint: $(GOBIN)/golint
+lint: $(GOBIN)/staticcheck
 	go vet ./...
-	golint -set_exit_status ./...
+	staticcheck -checks all ./...
 
-$(GOBIN)/golint:
-	cd && go get golang.org/x/lint/golint
+$(GOBIN)/staticcheck:
+	go install honnef.co/go/tools/cmd/staticcheck@latest
 
 .PHONY: clean
 clean:

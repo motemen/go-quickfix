@@ -1,9 +1,9 @@
 package rangestmt
 
 func F() {
-	for range []interface{}{} {
+	for range []any{} {
 	}
 
-	for i, x := range []interface{}{} {
+	for i, x := range []any{} {
 	}
 }

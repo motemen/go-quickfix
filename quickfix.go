@@ -41,9 +41,10 @@ func QuickFix(fset *token.FileSet, files []*ast.File) error {
 
 // QuickFix rewrites AST files of same package so that they pass go build.
 // For example:
-//   v declared but not used             -> append `_ = v`
-//   "p" imported but not used           -> rewrite to `import _ "p"`
-//   no new variables on left side of := -> rewrite `:=` to `=`
+//
+//	v declared but not used             -> append `_ = v`
+//	"p" imported but not used           -> rewrite to `import _ "p"`
+//	no new variables on left side of := -> rewrite `:=` to `=`
 //
 // TODO implement hardMode, which removes errorneous code rather than adding
 func (c Config) QuickFix() (err error) {
@@ -122,8 +123,9 @@ func RevertQuickFix(fset *token.FileSet, files []*ast.File) error {
 // This may result to non-buildable source, and cannot reproduce the original
 // code before prior QuickFix.
 // For example:
-//   `_ = v`        -> removed
-//   `import _ "p"` -> rewritten to `import "p"`
+//
+//	`_ = v`        -> removed
+//	`import _ "p"` -> rewritten to `import "p"`
 func (c Config) RevertQuickFix() (err error) {
 	fset := c.Fset
 	files := c.Files
@@ -157,7 +159,7 @@ func (c Config) RevertQuickFix() (err error) {
 			traverseAST(f, func(node ast.Node, nodepath []ast.Node) bool {
 				if nodeToRemove[node] {
 					parent := nodepath[0]
-					if removeChildNode(node, parent) == false {
+					if !removeChildNode(node, parent) {
 						err = fmt.Errorf(
 							"BUG: could not remove node: %s (in: %s)",
 							fset.Position(node.Pos()),
@@ -269,7 +271,7 @@ func (c Config) QuickFixOnce() (bool, error) {
 	}
 
 	for err, fix := range fixes {
-		if fix() == false {
+		if !fix() {
 			unhandled = append(unhandled, err)
 		}
 	}
