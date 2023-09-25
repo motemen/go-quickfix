@@ -15,8 +15,8 @@ import (
 )
 
 var (
-	declaredNotUsed        = regexp.MustCompile(`^([a-zA-Z0-9_]+) declared but not used$`)
-	importedNotUsed        = regexp.MustCompile(`^(".+") imported but not used`)
+	declaredNotUsed        = regexp.MustCompile(`^(\w+) declared (?:but|and) not used$`)
+	importedNotUsed        = regexp.MustCompile(`^(".+") imported (?:as \w+ )?(?:but|and) not used(?: as \w+)?$`)
 	noNewVariablesOnDefine = "no new variables on left side of :="
 )
 
