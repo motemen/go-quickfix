@@ -3,6 +3,7 @@
 package quickfix
 
 import (
+	"cmp"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -15,8 +16,8 @@ import (
 )
 
 var (
-	declaredNotUsed        = regexp.MustCompile(`^(\w+) declared (?:but|and) not used$`)
-	importedNotUsed        = regexp.MustCompile(`^(".+") imported (?:as \w+ )?(?:but|and) not used(?: as \w+)?$`)
+	declaredNotUsed        = regexp.MustCompile(`^(?:(\w+) )?declared and not used(?:: (\w+))?$`)
+	importedNotUsed        = regexp.MustCompile(`^(".+") imported (?:as \w+ )?and not used$`)
 	noNewVariablesOnDefine = "no new variables on left side of :="
 )
 
@@ -42,16 +43,13 @@ func QuickFix(fset *token.FileSet, files []*ast.File) error {
 // QuickFix rewrites AST files of same package so that they pass go build.
 // For example:
 //
-//	v declared but not used             -> append `_ = v`
-//	"p" imported but not used           -> rewrite to `import _ "p"`
+//	declared and not used: v            -> append `_ = v`
+//	"p" imported and not used           -> rewrite to `import _ "p"`
 //	no new variables on left side of := -> rewrite `:=` to `=`
 //
 // TODO implement hardMode, which removes errorneous code rather than adding
 func (c Config) QuickFix() (err error) {
-	maxTries := 10
-	if c.MaxTries > 0 {
-		maxTries = c.MaxTries
-	}
+	maxTries := cmp.Or(c.MaxTries, 10)
 	for i := 0; i < maxTries; i++ {
 		var foundError bool
 		foundError, err = c.QuickFixOnce()
@@ -243,12 +241,8 @@ func (c Config) QuickFixOnce() (bool, error) {
 
 		var fix func() bool
 
-		// - "%s declared but not used"
-		// - "%q imported but not used" (+ " as %s")
-		// - "label %s declared but not used" TODO
-		// - "no new variables on left side of :="
 		if m := declaredNotUsed.FindStringSubmatch(err.Msg); m != nil {
-			identName := m[1]
+			identName := cmp.Or(m[1], m[2])
 			fix = func() bool {
 				return fixDeclaredNotUsed(nodepath, identName)
 			}
@@ -280,7 +274,7 @@ func (c Config) QuickFixOnce() (bool, error) {
 }
 
 func fixDeclaredNotUsed(nodepath []ast.Node, identName string) bool {
-	// insert "_ = x" to supress "declared but not used" error
+	// insert "_ = x" to suppress "declared and not used" error
 	stmt := &ast.AssignStmt{
 		Lhs: []ast.Expr{ast.NewIdent("_")},
 		Tok: token.ASSIGN,
@@ -452,5 +446,6 @@ type ErrCouldNotLocate struct {
 }
 
 func (e ErrCouldNotLocate) Error() string {
-	return fmt.Sprintf("cannot find file for error %q: %s (%d)", e.Err.Error(), e.Fset.Position(e.Err.Pos), e.Err.Pos)
+	return fmt.Sprintf("cannot find file for error %q: %s (%d)",
+		e.Err.Error(), e.Fset.Position(e.Err.Pos), e.Err.Pos)
 }
